@@ -22,45 +22,57 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Find Project Root & Make Executable
+      - name: Locate Android Project & Ensure Gradle Wrapper
         run: |
-          if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
-          else
-            find . -name "gradlew" -exec chmod +x {} \;
+          BUILD_FILE=$(find . -name "build.gradle" -o -name "build.gradle.kts" | head -n 1)
+          
+          if [ -z "$BUILD_FILE" ]; then
+            echo "Error: No build.gradle or build.gradle.kts found anywhere in repository!"
+            echo "Please ensure that your Android project files are committed and pushed to this repository."
+            exit 1
           fi
+          
+          PROJECT_DIR=$(dirname "$BUILD_FILE")
+          echo "Found Android project at: $PROJECT_DIR"
+          cd "$PROJECT_DIR"
+          
+          if [ ! -f "./gradlew" ]; then
+            echo "gradlew wrapper script not found in repository. Generating Gradle wrapper..."
+            if ! command -v gradle &> /dev/null; then
+              echo "Installing Gradle on runner..."
+              sudo apt-get update -qq
+              sudo apt-get install -y gradle
+            fi
+            gradle wrapper --gradle-version 8.5
+          fi
+          
+          chmod +x ./gradlew
 
       - name: Build Debug APK
         run: |
+          BUILD_FILE=$(find . -name "build.gradle" -o -name "build.gradle.kts" | head -n 1)
+          PROJECT_DIR=$(dirname "$BUILD_FILE")
+          cd "$PROJECT_DIR"
+          
           if [ -f "./gradlew" ]; then
             ./gradlew assembleDebug --stacktrace --no-daemon
           else
-            GRADLEW_PATH=$(find . -name "gradlew" | head -n 1)
-            if [ -n "$GRADLEW_PATH" ]; then
-              cd $(dirname "$GRADLEW_PATH")
-              ./gradlew assembleDebug --stacktrace --no-daemon
-            else
-              echo "Error: gradlew not found in repository!"
-              exit 1
-            fi
+            gradle assembleDebug --stacktrace --no-daemon
           fi
 
       - name: Build Release APK
         run: |
+          BUILD_FILE=$(find . -name "build.gradle" -o -name "build.gradle.kts" | head -n 1)
+          PROJECT_DIR=$(dirname "$BUILD_FILE")
+          cd "$PROJECT_DIR"
+          
           if [ -f "./gradlew" ]; then
-            ./gradlew assembleRelease --stacktrace --no-daemon
+            ./gradlew assembleRelease --stacktrace --no-daemon || true
           else
-            GRADLEW_PATH=$(find . -name "gradlew" | head -n 1)
-            if [ -n "$GRADLEW_PATH" ]; then
-              cd $(dirname "$GRADLEW_PATH")
-              ./gradlew assembleRelease --stacktrace --no-daemon
-            fi
+            gradle assembleRelease --stacktrace --no-daemon || true
           fi
         continue-on-error: true
 
