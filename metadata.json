@@ -1,0 +1,6 @@
+{
+  "name": "Android Project Auditor & Build System",
+  "description": "Android project analysis, Gradle build audit, and GitHub Actions workflow configuration",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
