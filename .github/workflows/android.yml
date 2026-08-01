@@ -25,24 +25,46 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Locate Android Project & Ensure Gradle Wrapper
+      - name: Locate Android Project & Prepare Environment
         run: |
+          echo "=== Checking repository workspace ==="
+          
+          # Check if any .zip archive is present in the repository
+          ZIP_FILE=$(find . -maxdepth 3 -name "*.zip" | head -n 1)
+          if [ -n "$ZIP_FILE" ]; then
+            echo "Found ZIP file: $ZIP_FILE. Extracting files..."
+            unzip -o "$ZIP_FILE" -d .
+          fi
+          
           BUILD_FILE=$(find . -name "build.gradle" -o -name "build.gradle.kts" | head -n 1)
           
           if [ -z "$BUILD_FILE" ]; then
-            echo "Error: No build.gradle or build.gradle.kts found anywhere in repository!"
-            echo "Please ensure that your Android project files are committed and pushed to this repository."
+            echo "=========================================================================="
+            echo "âŒ ERROR: No build.gradle or build.gradle.kts found in repository!"
+            echo "=========================================================================="
+            echo "Repository contents:"
+            find . -maxdepth 3
+            echo "--------------------------------------------------------------------------"
+            echo "REASON: The GitHub repository 'X-cashiar' does not currently contain your Android project files."
+            echo "SOLUTION:"
+            echo "1. Extract your Android project ZIP file on your computer."
+            echo "2. Copy all files (app/, build.gradle, settings.gradle, gradlew, etc.) into your GitHub repository."
+            echo "3. Commit and push the changes to GitHub:"
+            echo "   git add ."
+            echo "   git commit -m 'Add Android project files'"
+            echo "   git push origin main"
+            echo "=========================================================================="
             exit 1
           fi
           
           PROJECT_DIR=$(dirname "$BUILD_FILE")
-          echo "Found Android project at: $PROJECT_DIR"
+          echo "Found Android project root at: $PROJECT_DIR"
           cd "$PROJECT_DIR"
           
           if [ ! -f "./gradlew" ]; then
-            echo "gradlew wrapper script not found in repository. Generating Gradle wrapper..."
+            echo "gradlew wrapper script not found. Generating Gradle wrapper automatically..."
             if ! command -v gradle &> /dev/null; then
-              echo "Installing Gradle on runner..."
+              echo "Installing Gradle..."
               sudo apt-get update -qq
               sudo apt-get install -y gradle
             fi
