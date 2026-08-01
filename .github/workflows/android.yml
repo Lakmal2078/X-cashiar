@@ -1,69 +1,114 @@
-<<<<<<< Updated upstream
-name: "Android CI Build & APK Artifacts"
-=======
-name: Android CI (Capacitor)
->>>>>>> Stashed changes
+name: Android CI Build
 
 on:
   push:
-    branches: [ 'fix/android-capacitor' ]
+    branches: [ "main", "master", "develop" ]
   pull_request:
-    branches: [ main ]
+    branches: [ "main", "master", "develop" ]
+  workflow_dispatch:
 
 jobs:
   build:
+    name: Build Android APK
     runs-on: ubuntu-latest
-    env:
-      JAVA_HOME_11_X64: /opt/hostedtoolcache/jdk/11/x64
+
     steps:
-      - name: Checkout
+      - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Setup Java 11
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '11'
+          distribution: 'zulu'
+          java-version: '17'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-<<<<<<< Updated upstream
-      - name: "Locate Android Project & Prepare Environment"
-=======
-      - name: Build web assets
-        run: npm run build:web
-
-      - name: Install Capacitor packages
-        run: npm install --no-save @capacitor/cli @capacitor/android @capacitor/core
-
-      - name: Add or sync Android platform
+      - name: Locate Android Project and Prepare Environment
         run: |
-          npx cap add android || true
-          npx cap sync android
-
-      - name: Set up Android SDK
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 33
-          target: default
-          arch: x86_64
-
-      - name: Build Android debug APK (Gradle)
-        working-directory: android
->>>>>>> Stashed changes
-        run: |
+          echo "=== Checking repository workspace ==="
+          
+          ZIP_FILE=$(find . -maxdepth 3 -name "*.zip" | head -n 1)
+          if [ -n "$ZIP_FILE" ]; then
+            echo "Found ZIP file: $ZIP_FILE. Extracting files..."
+            unzip -o "$ZIP_FILE" -d .
+          fi
+          
+          BUILD_FILE=$(find . -name "build.gradle" -o -name "build.gradle.kts" | head -n 1)
+          
+          if [ -z "$BUILD_FILE" ]; then
+            echo "=========================================================================="
+            echo "ERROR: No build.gradle or build.gradle.kts found in repository!"
+            echo "=========================================================================="
+            echo "Repository contents:"
+            find . -maxdepth 3
+            echo "--------------------------------------------------------------------------"
+            echo "REASON: The GitHub repository does not contain your Android project files."
+            echo "SOLUTION:"
+            echo "1. Extract your Android project ZIP file on your computer."
+            echo "2. Copy all files into your GitHub repository."
+            echo "3. Commit and push: git add . && git commit -m 'Add Android project' && git push"
+            echo "=========================================================================="
+            exit 1
+          fi
+          
+          PROJECT_DIR=$(dirname "$BUILD_FILE")
+          echo "Found Android project root at: $PROJECT_DIR"
+          cd "$PROJECT_DIR"
+          
+          if [ ! -f "./gradlew" ]; then
+            echo "gradlew wrapper script not found. Generating Gradle wrapper automatically..."
+            if ! command -v gradle &> /dev/null; then
+              echo "Installing Gradle..."
+              sudo apt-get update -qq
+              sudo apt-get install -y gradle
+            fi
+            gradle wrapper --gradle-version 8.5
+          fi
+          
           chmod +x ./gradlew
-          ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK artifact
+      - name: Build Debug APK
+        run: |
+          BUILD_FILE=$(find . -name "build.gradle" -o -name "build.gradle.kts" | head -n 1)
+          if [ -n "$BUILD_FILE" ]; then
+            PROJECT_DIR=$(dirname "$BUILD_FILE")
+            cd "$PROJECT_DIR"
+            if [ -f "./gradlew" ]; then
+              ./gradlew assembleDebug --stacktrace --no-daemon
+            else
+              gradle assembleDebug --stacktrace --no-daemon
+            fi
+          else
+            echo "ERROR: No build file found."
+            exit 1
+          fi
+
+      - name: Build Release APK
+        continue-on-error: true
+        run: |
+          BUILD_FILE=$(find . -name "build.gradle" -o -name "build.gradle.kts" | head -n 1)
+          if [ -n "$BUILD_FILE" ]; then
+            PROJECT_DIR=$(dirname "$BUILD_FILE")
+            cd "$PROJECT_DIR"
+            if [ -f "./gradlew" ]; then
+              ./gradlew assembleRelease --stacktrace --no-daemon || true
+            else
+              gradle assembleRelease --stacktrace --no-daemon || true
+            fi
+          fi
+
+      - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: "**/build/outputs/apk/debug/*.apk"
+          if-no-files-found: warn
 
+      - name: Upload Release APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: "**/build/outputs/apk/release/*.apk"
+          if-no-files-found: ignore
