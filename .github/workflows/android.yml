@@ -89,3 +89,4 @@ jobs:
           name: app-release-apk
           path: "**/build/outputs/apk/release/*.apk"
           if-no-files-found: ignore
+
