@@ -1,4 +1,4 @@
-name: Android CI Build & APK Artifacts
+name: "Android CI Build & APK Artifacts"
 
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Locate Android Project & Prepare Environment
+      - name: "Locate Android Project & Prepare Environment"
         run: |
           echo "=== Checking repository workspace ==="
           
