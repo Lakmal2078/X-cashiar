@@ -1,7 +1,5 @@
 {
   "appId": "com.lakmal.xcashiar",
   "appName": "X-cashiar",
-  "webDir": "dist",
-  "bundledWebRuntime": false
+  "webDir": "dist"
 }
-
